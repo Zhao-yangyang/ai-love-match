@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { config } from '@/lib/config';
 import type { AssessmentConfig } from '@/types/assessment';
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -30,9 +30,9 @@ export async function POST(request: Request) {
       config: AssessmentConfig;
     };
 
-    // 添加超时控制
+    // 修改超时时间为55秒，留出一些buffer时间
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
 
     // 构建问题生成提示
     const prompt = `
