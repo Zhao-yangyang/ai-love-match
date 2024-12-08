@@ -3,15 +3,7 @@ import { NextResponse } from 'next/server';
 import { AssessmentConfig } from '@/types/assessment';
 import { config } from '@/lib/config';
 
-// 检查环境变量
-if (!config.deepseekApiKey) {
-  console.error('Missing DEEPSEEK_API_KEY');
-  return NextResponse.json(
-    { error: 'API configuration error' },
-    { status: 500 }
-  );
-}
-
+// 初始化 OpenAI 客户端
 const client = new OpenAI({
   apiKey: config.deepseekApiKey,
   baseURL: config.deepseekBaseUrl,
@@ -22,11 +14,26 @@ export const runtime = 'edge';
 export const preferredRegion = 'iad1';
 export const dynamic = 'force-dynamic';
 
+type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  name?: string;
+};
+
 export async function POST(request: Request) {
+  // 检查环境变量
+  if (!config.deepseekApiKey) {
+    console.error('Missing DEEPSEEK_API_KEY');
+    return NextResponse.json(
+      { error: 'API configuration error' },
+      { status: 500 }
+    );
+  }
+
   try {
     const { config: assessmentConfig, answers } = await request.json();
     
-    const messages = [
+    const messages: ChatMessage[] = [
       {
         role: 'system',
         content: `You are a professional relationship analyst. Please analyze the assessment results and provide feedback in JSON format.
