@@ -6,6 +6,37 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+// 添加JSON清理函数
+function sanitizeJsonString(str: string): string {
+  // 移除可能导致JSON解析错误的字符
+  return str
+    .replace(/[\u0000-\u001F]+/g, '') // 移除控制字符
+    .replace(/\\(?!["\\/bfnrtu])/g, '\\\\') // 处理反斜杠
+    .replace(/[\u2028\u2029]/g, '\\n'); // 处理行分隔符
+}
+
+// 验证结果格式
+function validateAnalysisResult(result: unknown): boolean {
+  const maybeResult = result as Partial<{
+    score: number;
+    compatibility: string;
+    suggestions: string[];
+    aiAnalysis: string;
+  }>;
+  
+  return (
+    typeof maybeResult === 'object' &&
+    maybeResult !== null &&
+    typeof maybeResult.score === 'number' &&
+    maybeResult.score >= 0 &&
+    maybeResult.score <= 100 &&
+    typeof maybeResult.compatibility === 'string' &&
+    Array.isArray(maybeResult.suggestions) &&
+    maybeResult.suggestions.every((s: unknown) => typeof s === 'string') &&
+    typeof maybeResult.aiAnalysis === 'string'
+  );
+}
+
 export async function POST(request: Request) {
   try {
     // 添加请求体验证
@@ -45,7 +76,7 @@ export async function POST(request: Request) {
 
 请提供以下分析结果（必须使用中文）：
 1. 0-100的量化评分
-2. 整体契合度评价（一句话）
+2. 整体契��度评价（一句话）
 3. 3-5条具体的改善建议
 4. 详细的分析报告（使用markdown格式）
 
@@ -96,11 +127,20 @@ export async function POST(request: Request) {
         throw new Error('API返回数据格式错误');
       }
 
-      const result = JSON.parse(data.choices[0].message.content);
+      // 使用sanitizeJsonString函数清理返回数据
+      const cleanContent = sanitizeJsonString(data.choices[0].message.content);
+      let result;
+      
+      try {
+        result = JSON.parse(cleanContent);
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError);
+        throw new Error('API返回的JSON格式无效');
+      }
 
-      // 验证返回数据格式
-      if (!result.score || !result.compatibility || !Array.isArray(result.suggestions) || !result.aiAnalysis) {
-        throw new Error('API返回数据不完整');
+      // 使用validateAnalysisResult函数验证结果
+      if (!validateAnalysisResult(result)) {
+        throw new Error('API返回数据不完整或格式错误');
       }
 
       return NextResponse.json(result);
