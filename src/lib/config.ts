@@ -13,5 +13,5 @@ const getEnvVar = (key: string) => {
 
 export const config = {
   deepseekApiKey: getEnvVar('DEEPSEEK_API_KEY'),
-  deepseekBaseUrl: 'https://api.deepseek.com/v1'
+  deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1'
 } as const; 
