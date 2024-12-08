@@ -152,7 +152,17 @@ function ResultContent() {
             <Typewriter 
               text={data.aiAnalysis}
               speed={30}
-              className="prose prose-invert max-w-none prose-headings:mt-4 prose-p:my-2 prose-blockquote:my-2"
+              className="prose dark:prose-invert max-w-none 
+                prose-headings:text-foreground 
+                prose-p:text-foreground/90 
+                prose-strong:text-foreground 
+                prose-ul:text-foreground/90
+                prose-li:text-foreground/90
+                prose-blockquote:text-foreground/80 
+                prose-blockquote:border-l-primary
+                prose-headings:mt-4 
+                prose-p:my-2 
+                prose-blockquote:my-2"
               renderText={(text) => (
                 <ReactMarkdown>
                   {text}
