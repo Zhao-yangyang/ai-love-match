@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { questions } from '@/data/questions';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { AssessmentConfig } from '@/types/assessment';
 import { LoadingSpinner } from '@/components/ui/loading';

@@ -38,6 +38,8 @@ export async function POST(request: Request) {
       - 姓名：${config.participantInfo.name}
       `}
 
+      基于用户的答案：${JSON.stringify(answers)}
+
       请提供以下格式的JSON响应：
       {
         "analysis": "markdown格式的详细分析",
