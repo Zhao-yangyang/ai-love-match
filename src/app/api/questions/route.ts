@@ -15,6 +15,9 @@ type ChatMessage = {
   content: string;
 };
 
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const { config } = await request.json() as {

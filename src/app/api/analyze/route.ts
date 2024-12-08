@@ -9,33 +9,35 @@ const client = new OpenAI({
   dangerouslyAllowBrowser: true
 });
 
-// 定义OpenAI API所需的消息类型
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
-  name?: string;
 };
+
+export const runtime = 'edge'; // 使用边缘运行时
+export const dynamic = 'force-dynamic'; // 强制动态渲染
 
 export async function POST(request: Request) {
   try {
-    const { config, answers } = await request.json() as {
+    const body = await request.json();
+    const { config: userConfig, answers } = body as {
       config: AssessmentConfig;
       answers: Record<number, number>;
     };
 
     const messages: ChatMessage[] = [{
       role: 'system',
-      content: `你是一个专业的情感分析师，专注于${config.mode === 'single' ? '个人情感能力' : '情侣关系'}分析。
+      content: `你是一个专业的情感分析师，专注于${userConfig.mode === 'single' ? '个人情感能力' : '情侣关系'}分析。
       
-      ${config.mode === 'couple' ? `
+      ${userConfig.mode === 'couple' ? `
       情侣信息：
-      - 恋爱时长：${config.participantInfo.relationshipDuration}个月
-      - 年龄：${config.participantInfo.age}岁
-      - 姓名：${config.participantInfo.name}
+      - 恋爱时长：${userConfig.participantInfo.relationshipDuration}个月
+      - 年龄：${userConfig.participantInfo.age}岁
+      - 姓名：${userConfig.participantInfo.name}
       ` : `
       个人信息：
-      - 年龄：${config.participantInfo.age}岁
-      - 姓名：${config.participantInfo.name}
+      - 年龄：${userConfig.participantInfo.age}岁
+      - 姓名：${userConfig.participantInfo.name}
       `}
 
       基于用户的答案：${JSON.stringify(answers)}
@@ -83,12 +85,28 @@ export async function POST(request: Request) {
       response_format: { type: 'json_object' }
     });
 
-    const data = JSON.parse(response.choices[0].message?.content || '{}');
-    return NextResponse.json(data);
+    const aiResponse = response.choices[0].message?.content;
+    if (!aiResponse) {
+      return NextResponse.json(
+        { error: '未获取到AI响应' },
+        { status: 500 }
+      );
+    }
+
+    try {
+      const data = JSON.parse(aiResponse);
+      return NextResponse.json(data);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      return NextResponse.json(
+        { error: 'AI响应格式错误' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('AI Analysis Error:', error);
     return NextResponse.json(
-      { error: 'AI分析服务暂时不可用，请稍后再试' },
+      { error: 'AI分析服务暂时不可用，请重试' },
       { status: 500 }
     );
   }
