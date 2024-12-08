@@ -1,7 +1,6 @@
-const getEnvVar = (key: string) => {
+const getEnvVar = (key: string): string => {
   const value = process.env[key];
   if (!value) {
-    // 在开发环境中抛出错误，在生产环境中使用默认值
     if (process.env.NODE_ENV === 'development') {
       throw new Error(`Missing ${key} environment variable`);
     }

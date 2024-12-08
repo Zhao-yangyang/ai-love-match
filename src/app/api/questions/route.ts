@@ -1,17 +1,38 @@
 import { NextResponse } from 'next/server';
 import { config } from '@/lib/config';
+import type { AssessmentConfig } from '@/types/assessment';
 
-export const maxDuration = 300; // 设置最大超时时间为300秒
-export const dynamic = 'force-dynamic'; // 强制动态渲染
-export const fetchCache = 'force-no-store'; // 禁用缓存
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(request: Request) {
   try {
-    const { config: assessmentConfig } = await request.json();
+    // 添加请求体验证
+    if (!request.body) {
+      return NextResponse.json(
+        { error: '请求体不能为空' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    
+    // 验证请求数据
+    if (!body.config) {
+      return NextResponse.json(
+        { error: '缺少必要的配置参数' },
+        { status: 400 }
+      );
+    }
+
+    const { config: assessmentConfig } = body as {
+      config: AssessmentConfig;
+    };
 
     // 添加超时控制
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     // 构建问题生成提示
     const prompt = `
@@ -56,82 +77,87 @@ ${assessmentConfig.mode === 'couple' ? `- 恋爱时长：${assessmentConfig.part
    - 选项按价值递增排序(1-4)
    - 避免敏感或负面话题
 
-4. 问题示例：
-   问题："在与他人交往时，你更��向于？"
-   选项：
-   1. "保持适当距离，谨慎对待"
-   2. "随遇而安，顺其自然"
-   3. "主动交流，建立联系"
-   4. "热情开放，深入交往"
-
 请确保所有内容使用中文，并保持JSON格式正确。`;
 
-    // 调用 API
-    const response = await fetch(config.deepseekBaseUrl + '/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.deepseekApiKey}`
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          {
-            role: 'system',
-            content: '你是一个专业的情感测评系统，请用中文生成所有问题和选项。'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId); // 清除超时计时器
-
-    if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const questionsText = data.choices[0].message.content;
-    
     try {
-      const parsedData = JSON.parse(questionsText);
-      const questions = parsedData.questions;
-
-      // 添加错误重试逻辑
-      if (!Array.isArray(questions) || questions.length === 0) {
-        throw new Error('问题格式错误');
-      }
-
-      // 验证每个问题的结构
-      questions.forEach(q => {
-        if (!q.id || !q.question || !q.category || !Array.isArray(q.options) || q.options.length !== 4) {
-          throw new Error('问题结构错误');
-        }
+      // 调用 API
+      const response = await fetch(config.deepseekBaseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.deepseekApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'system',
+              content: '你是一个专业的情感测评系统，请用中文生成所有问题和选项。'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        }),
+        signal: controller.signal
       });
 
-      return NextResponse.json({ questions });
-    } catch (parseError) {
-      console.error('Questions Parse Error:', parseError, questionsText);
-      return NextResponse.json(
-        { error: '问题格式错误，正在重试...' },
-        { status: 500 }
-      );
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`API请求失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.choices?.[0]?.message?.content) {
+        throw new Error('API返回数据格式错误');
+      }
+
+      const questionsText = data.choices[0].message.content;
+      
+      try {
+        const parsedData = JSON.parse(questionsText);
+        const questions = parsedData.questions;
+
+        // 验证问题格式
+        if (!Array.isArray(questions) || questions.length === 0) {
+          throw new Error('问题格式错误');
+        }
+
+        // 验证每个问题的结构
+        questions.forEach(q => {
+          if (!q.id || !q.question || !q.category || !Array.isArray(q.options) || q.options.length !== 4) {
+            throw new Error('问题结构错误');
+          }
+        });
+
+        return NextResponse.json({ questions });
+      } catch (parseError) {
+        console.error('Questions Parse Error:', parseError, questionsText);
+        throw new Error('问题格式解析失败');
+      }
+    } catch (apiError: unknown) {
+      console.error('API Error:', apiError);
+      throw new Error(apiError instanceof Error ? apiError.message : 'API调用失败');
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Questions Generation Error:', error);
     
     // 根据错误类型返回不同的错误信息
-    if (error.name === 'AbortError') {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return NextResponse.json(
+          { error: '请求超时，请重试' },
+          { status: 504 }
+        );
+      }
       return NextResponse.json(
-        { error: '请求超时，请重试' },
-        { status: 504 }
+        { error: error.message },
+        { status: 500 }
       );
     }
     

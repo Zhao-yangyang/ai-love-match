@@ -3,7 +3,6 @@
 import { Suspense, useEffect } from 'react';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { ErrorMessage } from '@/components/ui/error-message';
@@ -44,7 +43,7 @@ function ResultContent() {
       
       // 检查必要字段
       if (!parsedData || typeof parsedData !== 'object') {
-        throw new Error('数据格式错误');
+        throw new Error('数据格式错���');
       }
 
       // 分别检查每个必要字段
@@ -187,25 +186,14 @@ function ResultContent() {
 // 主页面组件
 export default function Result() {
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between p-6 max-w-7xl mx-auto w-full">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Image src="/heart.svg" alt="Logo" width={32} height={32} className="text-primary" />
-          <span className="text-xl font-semibold">AI Love Match</span>
-        </Link>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full">
-        <Suspense fallback={
-          <div className="flex items-center justify-center">
-            <LoadingSpinner />
-          </div>
-        }>
-          <ResultContent />
-        </Suspense>
-      </main>
-    </div>
+    <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full">
+      <Suspense fallback={
+        <div className="flex items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      }>
+        <ResultContent />
+      </Suspense>
+    </main>
   );
 } 
