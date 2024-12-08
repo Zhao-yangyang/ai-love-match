@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
 import { config } from '@/lib/config';
 
+export const maxDuration = 300; // 设置最大超时时间为300秒
+export const dynamic = 'force-dynamic'; // 强制动态渲染
+export const fetchCache = 'force-no-store'; // 禁用缓存
+
 export async function POST(request: Request) {
   try {
     const { config: assessmentConfig } = await request.json();
+
+    // 添加超时控制
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
 
     // 构建问题生成提示
     const prompt = `
@@ -49,7 +57,7 @@ ${assessmentConfig.mode === 'couple' ? `- 恋爱时长：${assessmentConfig.part
    - 避免敏感或负面话题
 
 4. 问题示例：
-   问题："在与他人交往时，你更倾向于？"
+   问题："在与他人交往时，你更��向于？"
    选项：
    1. "保持适当距离，谨慎对待"
    2. "随遇而安，顺其自然"
@@ -79,11 +87,14 @@ ${assessmentConfig.mode === 'couple' ? `- 恋爱时长：${assessmentConfig.part
         ],
         temperature: 0.7,
         max_tokens: 2000
-      })
+      }),
+      signal: controller.signal
     });
 
+    clearTimeout(timeoutId); // 清除超时计时器
+
     if (!response.ok) {
-      throw new Error('API 请求失败');
+      throw new Error(`API请求失败: ${response.status}`);
     }
 
     const data = await response.json();
@@ -93,7 +104,7 @@ ${assessmentConfig.mode === 'couple' ? `- 恋爱时长：${assessmentConfig.part
       const parsedData = JSON.parse(questionsText);
       const questions = parsedData.questions;
 
-      // 验证问题格式
+      // 添加错误重试逻辑
       if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('问题格式错误');
       }
@@ -109,12 +120,21 @@ ${assessmentConfig.mode === 'couple' ? `- 恋爱时长：${assessmentConfig.part
     } catch (parseError) {
       console.error('Questions Parse Error:', parseError, questionsText);
       return NextResponse.json(
-        { error: '问题格式错误，请重试' },
+        { error: '问题格式错误，正在重试...' },
         { status: 500 }
       );
     }
   } catch (error) {
     console.error('Questions Generation Error:', error);
+    
+    // 根据错误类型返回不同的错误信息
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: '请求超时，请重试' },
+        { status: 504 }
+      );
+    }
+    
     return NextResponse.json(
       { error: '生成问题失败，请重试' },
       { status: 500 }

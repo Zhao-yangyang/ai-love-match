@@ -21,8 +21,9 @@ function TestContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchQuestions = async () => {
+    const fetchQuestions = async (retryCount = 0) => {
       try {
+        setLoading(true);
         const configParam = searchParams.get('config');
         if (!configParam) {
           throw new Error('未找到配置信息');
@@ -36,21 +37,22 @@ function TestContent() {
         });
 
         if (!response.ok) {
-          throw new Error('获取问题失败');
+          const errorData = await response.json();
+          throw new Error(errorData.error || '获取问题失败');
         }
 
         const data = await response.json();
-        if (!data.questions || !Array.isArray(data.questions)) {
-          throw new Error('问题格式错误');
-        }
-
         setQuestions(data.questions);
-        setError(null);
+        setLoading(false);
       } catch (e) {
         console.error('Questions Error:', e);
-        setError(e instanceof Error ? e.message : '加载问题时出错');
-      } finally {
-        setLoading(false);
+        if (retryCount < 3) { // 最多重试3次
+          console.log(`重试第 ${retryCount + 1} 次`);
+          setTimeout(() => fetchQuestions(retryCount + 1), 2000); // 2秒后重试
+        } else {
+          setError(e instanceof Error ? e.message : '获取问题失败');
+          setLoading(false);
+        }
       }
     };
 
