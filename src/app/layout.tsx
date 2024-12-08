@@ -1,5 +1,6 @@
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Header } from '@/components/layout/header';
 
 export default function RootLayout({
   children,
@@ -15,7 +16,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <Header />
+          <main className="container mx-auto px-4 py-8">
+            {children}
+          </main>
         </ThemeProvider>
       </body>
     </html>
