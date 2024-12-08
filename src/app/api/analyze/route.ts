@@ -14,7 +14,8 @@ type ChatMessage = {
   content: string;
 };
 
-export const runtime = 'edge'; // 使用边缘运行时
+export const runtime = 'edge';
+export const preferredRegion = 'iad1';
 export const dynamic = 'force-dynamic'; // 强制动态渲染
 
 export async function POST(request: Request) {

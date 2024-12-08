@@ -16,6 +16,7 @@ type ChatMessage = {
 };
 
 export const runtime = 'edge';
+export const preferredRegion = 'iad1';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
