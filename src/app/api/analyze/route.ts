@@ -20,6 +20,11 @@ type ChatMessage = {
   name?: string;
 };
 
+type RequestBody = {
+  config: AssessmentConfig;
+  answers: Record<number, number>;
+};
+
 export async function POST(request: Request) {
   // 检查环境变量
   if (!config.deepseekApiKey) {
@@ -31,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { config: assessmentConfig, answers } = await request.json();
+    const { config: assessmentConfig, answers } = await request.json() as RequestBody;
     
     const messages: ChatMessage[] = [
       {
