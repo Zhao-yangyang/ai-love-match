@@ -1,12 +1,15 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { InfoForm } from '@/components/assessment/info-form';
 import { AssessmentConfig, AssessmentMode, AssessmentType } from '@/types/assessment';
+import { LoadingSpinner } from '@/components/ui/loading';
 
-export default function Info() {
+// 分离出使用 useSearchParams 的组件
+function InfoContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') as AssessmentMode;
@@ -18,11 +21,15 @@ export default function Info() {
   }
 
   const handleSubmit = (config: AssessmentConfig) => {
-    // 将配置信息序列化并传递到测评页面
     const configStr = encodeURIComponent(JSON.stringify(config));
     router.push(`/test?config=${configStr}`);
   };
 
+  return <InfoForm mode={mode} type={type} onSubmit={handleSubmit} />;
+}
+
+// 主页面组件
+export default function Info() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -35,7 +42,13 @@ export default function Info() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-6">
-        <InfoForm mode={mode} type={type} onSubmit={handleSubmit} />
+        <Suspense fallback={
+          <div className="flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        }>
+          <InfoContent />
+        </Suspense>
       </main>
     </div>
   );
