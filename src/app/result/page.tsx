@@ -42,14 +42,29 @@ function ResultContent() {
       
       const parsedData = JSON.parse(decodeURIComponent(dataParam)) as ResultData;
       
+      // 检查必要字段
+      if (!parsedData || typeof parsedData !== 'object') {
+        throw new Error('数据格式错误');
+      }
+
+      // 分别检查每个必要字段
       if (!parsedData.config) {
         throw new Error('缺少配置信息');
       }
       if (!parsedData.answers || Object.keys(parsedData.answers).length === 0) {
         throw new Error('缺少答案数据');
       }
-      if (!parsedData.aiAnalysis || !parsedData.suggestions || !parsedData.compatibility) {
-        throw new Error('缺少分析结果');
+      if (typeof parsedData.score !== 'number') {
+        throw new Error('缺少分数数据');
+      }
+      if (!parsedData.compatibility) {
+        throw new Error('缺少契合度评价');
+      }
+      if (!Array.isArray(parsedData.suggestions)) {
+        throw new Error('缺少改善建议');
+      }
+      if (!parsedData.aiAnalysis) {
+        throw new Error('缺少AI分析结果');
       }
 
       setData(parsedData);

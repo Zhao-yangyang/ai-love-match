@@ -1,119 +1,107 @@
-import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
-import { AssessmentConfig } from '@/types/assessment';
-import { Question } from '@/data/questions';
 import { config } from '@/lib/config';
 
-// 初始化 OpenAI 客户端
-const client = new OpenAI({
-  apiKey: config.deepseekApiKey,
-  baseURL: config.deepseekBaseUrl,
-  dangerouslyAllowBrowser: true
-});
-
-type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-  name?: string;
-};
-
-export const runtime = 'edge';
-export const preferredRegion = 'iad1';
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: Request) {
-  // 检查环境变量
-  if (!config.deepseekApiKey) {
-    console.error('Missing DEEPSEEK_API_KEY');
-    return NextResponse.json(
-      { error: 'API configuration error' },
-      { status: 500 }
-    );
-  }
-
   try {
-    const { config: assessmentConfig } = await request.json() as {
-      config: AssessmentConfig;
-    };
+    const { config: assessmentConfig } = await request.json();
 
-    const messages: ChatMessage[] = [{
-      role: 'system',
-      content: `You are a professional relationship assessment system. Please generate personalized questions based on user information.
+    // 构建问题生成提示
+    const prompt = `
+你是一个专业的情感测评系统，需要根据用户信息生成个性化的测评问题。请以JSON格式返回问题列表。
 
-User Info:
-- Mode: ${assessmentConfig.mode === 'single' ? 'Individual' : 'Couple'}
-- Age: ${assessmentConfig.participantInfo.age}
-${assessmentConfig.mode === 'couple' ? `- Relationship Duration: ${assessmentConfig.participantInfo.relationshipDuration} months` : ''}
+用户信息：
+- 模式：${assessmentConfig.mode === 'single' ? '单人测评' : '双人测评'}
+- 年龄：${assessmentConfig.participantInfo.age}岁
+${assessmentConfig.mode === 'couple' ? `- 恋爱时长：${assessmentConfig.participantInfo.relationshipDuration}个月` : ''}
 
-Please return questions in the following JSON format:
+请按以下格式返回JSON：
 {
   "questions": [
     {
-      "id": number,
-      "question": "Question text",
-      "category": "Category",
+      "id": 数字,
+      "question": "问题文本",
+      "category": "分类",
       "options": [
-        { "value": 1, "text": "Option 1" },
-        { "value": 2, "text": "Option 2" },
-        { "value": 3, "text": "Option 3" },
-        { "value": 4, "text": "Option 4" }
+        { "value": 1, "text": "选项1" },
+        { "value": 2, "text": "选项2" },
+        { "value": 3, "text": "选项3" },
+        { "value": 4, "text": "选项4" }
       ],
-      "coupleOnly": boolean
+      "coupleOnly": 布尔值
     }
   ]
 }
 
-Requirements:
-1. Question Count:
-   - General Questions: 6
-   - Couple-specific Questions: 3 (only for couple mode)
+要求：
+1. 问题数量：
+   - 通用问题：6题
+   - 双人专属问题：3题（仅在双人模式时使用）
 
-2. Question Categories:
-   - Personality
-   - Values
-   - Lifestyle
+2. 问题类型分布：
+   - 性格相关：了解性格特征、行为模式
+   - 价值观相关：了解人生观、恋爱观
+   - 生活习惯相关：了解日常生活偏好
 
-3. Content Guidelines:
-   - Professional tone
-   - Clear distinctions between options
-   - Options ordered by value (1-4)
-   - Avoid sensitive topics
+3. 内容要求：
+   - 措辞要温和专业
+   - 选项要有明显区分度
+   - 选项按价值递增排序(1-4)
+   - 避免敏感或负面话题
 
-Please ensure valid JSON format.`
-    }, {
-      role: 'user',
-      content: 'Please generate assessment questions'
-    }];
+4. 问题示例：
+   问题："在与他人交往时，你更倾向于？"
+   选项：
+   1. "保持适当距离，谨慎对待"
+   2. "随遇而安，顺其自然"
+   3. "主动交流，建立联系"
+   4. "热情开放，深入交往"
 
-    const response = await client.chat.completions.create({
-      model: 'deepseek-chat',
-      messages,
-      temperature: 0.8,
-      max_tokens: 2000,
-      response_format: {
-        type: 'json_object'
-      }
+请确保所有内容使用中文，并保持JSON格式正确。`;
+
+    // 调用 API
+    const response = await fetch(config.deepseekBaseUrl + '/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.deepseekApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: '你是一个专业的情感测评系统，请用中文生成所有问题和选项。'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
     });
 
-    const questionsText = response.choices[0].message?.content;
-    if (!questionsText) {
-      return NextResponse.json(
-        { error: 'No questions generated' },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      throw new Error('API 请求失败');
     }
 
+    const data = await response.json();
+    const questionsText = data.choices[0].message.content;
+    
     try {
-      const data = JSON.parse(questionsText);
-      const questions = data.questions as Question[];
+      const parsedData = JSON.parse(questionsText);
+      const questions = parsedData.questions;
 
+      // 验证问题格式
       if (!Array.isArray(questions) || questions.length === 0) {
-        throw new Error('Invalid question format');
+        throw new Error('问题格式错误');
       }
 
+      // 验证每个问题的结构
       questions.forEach(q => {
         if (!q.id || !q.question || !q.category || !Array.isArray(q.options) || q.options.length !== 4) {
-          throw new Error('Invalid question structure');
+          throw new Error('问题结构错误');
         }
       });
 
@@ -121,14 +109,14 @@ Please ensure valid JSON format.`
     } catch (parseError) {
       console.error('Questions Parse Error:', parseError, questionsText);
       return NextResponse.json(
-        { error: 'Question format error' },
+        { error: '问题格式错误，请重试' },
         { status: 500 }
       );
     }
   } catch (error) {
     console.error('Questions Generation Error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate questions' },
+      { error: '生成问题失败，请重试' },
       { status: 500 }
     );
   }

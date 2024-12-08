@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ModeSelection } from '@/components/assessment/mode-selection';
 import { AssessmentMode, AssessmentType } from '@/types/assessment';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export default function Home() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function Home() {
           <Image src="/heart.svg" alt="Logo" width={32} height={32} className="text-primary" />
           <span className="text-xl font-semibold">AI Love Match</span>
         </div>
+        <ThemeToggle />
       </header>
 
       {/* Main Content */}

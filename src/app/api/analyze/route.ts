@@ -1,97 +1,69 @@
-import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
-import { AssessmentConfig } from '@/types/assessment';
 import { config } from '@/lib/config';
 
-// 初始化 OpenAI 客户端
-const client = new OpenAI({
-  apiKey: config.deepseekApiKey,
-  baseURL: config.deepseekBaseUrl,
-  dangerouslyAllowBrowser: true
-});
-
-export const runtime = 'edge';
-export const preferredRegion = 'iad1';
-export const dynamic = 'force-dynamic';
-
-type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-  name?: string;
-};
-
-type RequestBody = {
-  config: AssessmentConfig;
-  answers: Record<number, number>;
-};
-
 export async function POST(request: Request) {
-  // 检查环境变量
-  if (!config.deepseekApiKey) {
-    console.error('Missing DEEPSEEK_API_KEY');
-    return NextResponse.json(
-      { error: 'API configuration error' },
-      { status: 500 }
-    );
-  }
-
   try {
-    const { config: assessmentConfig, answers } = await request.json() as RequestBody;
-    
-    const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content: `You are a professional relationship analyst. Please analyze the assessment results and provide feedback in JSON format.
+    const { config: assessmentConfig, answers } = await request.json();
 
-Assessment type: ${assessmentConfig.mode === 'single' ? 'Individual' : 'Couple'}
-Age: ${assessmentConfig.participantInfo.age}
-${assessmentConfig.mode === 'couple' ? `Relationship duration: ${assessmentConfig.participantInfo.relationshipDuration} months` : ''}
+    // 构建分析提示
+    const prompt = `
+你是一位专业的情感分析专家。请用中文分析以下测评结果：
 
-Please return response in the following JSON format:
+测评模式：${assessmentConfig.mode === 'single' ? '单人测评' : '双人测评'}
+参与者信息：${assessmentConfig.participantInfo.name}，${assessmentConfig.participantInfo.age}岁
+答案数据：${JSON.stringify(answers)}
+
+请提供以下分析结果（必须使用中文）：
+1. 0-100的量化评分
+2. 整体契合度评价（一句话）
+3. 3-5条具体的改善建议
+4. 详细的分析报告（使用markdown格式）
+
+回复格式：
 {
-  "analysis": "Detailed analysis text",
-  "score": number (0-100),
-  "compatibility": "Compatibility level description",
-  "suggestions": ["suggestion1", "suggestion2", "suggestion3"]
+  "score": 数字,
+  "compatibility": "契合度评价",
+  "suggestions": ["建议1", "建议2", "建议3"],
+  "aiAnalysis": "详细分析（markdown格式）"
 }
-`
-      },
-      {
-        role: 'user',
-        content: `Please analyze these answers: ${JSON.stringify(answers)}`
-      }
-    ];
+`;
 
-    const response = await client.chat.completions.create({
-      model: 'deepseek-chat',
-      messages,
-      temperature: 0.8,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' }
+    // 调用 API
+    const response = await fetch(config.deepseekBaseUrl + '/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.deepseekApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: '你是一位专业的情感分析专家，请用中文回答所有问题。'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
     });
 
-    const aiResponse = response.choices[0].message?.content;
-    if (!aiResponse) {
-      return NextResponse.json(
-        { error: 'No AI response received' },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      throw new Error('API 请求失败');
     }
 
-    try {
-      const data = JSON.parse(aiResponse);
-      return NextResponse.json(data);
-    } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      return NextResponse.json(
-        { error: 'Invalid AI response format' },
-        { status: 500 }
-      );
-    }
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0].message.content);
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('AI Analysis Error:', error);
+    console.error('Analysis Error:', error);
     return NextResponse.json(
-      { error: 'AI analysis service temporarily unavailable' },
+      { error: '分析失败，请稍后重试' },
       { status: 500 }
     );
   }
