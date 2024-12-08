@@ -4,6 +4,10 @@ import { AssessmentConfig } from '@/types/assessment';
 import { Question } from '@/data/questions';
 import { config } from '@/lib/config';
 
+if (!config.deepseekApiKey) {
+  throw new Error('DEEPSEEK_API_KEY is required but not set');
+}
+
 const client = new OpenAI({
   apiKey: config.deepseekApiKey,
   baseURL: config.deepseekBaseUrl,
@@ -43,7 +47,7 @@ export async function POST(request: Request) {
             "category": "性格",
             "options": [
               { "value": 1, "text": "选项1" },
-              { "value": 2, "text": "选项2" },
+              { "value": 2, "text": "���项2" },
               { "value": 3, "text": "选项3" },
               { "value": 4, "text": "选项4" }
             ],
